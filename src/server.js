@@ -10,10 +10,31 @@ const urlStruct = {
   '/': responseHandler.getIndex,
   '/getUsers': responseHandler.getUsers,
   '/addUser': responseHandler.addUser,
-  '/notReal': responseHandler.notReal,
+  '/notReal': responseHandler.getNotFound,
   '/style.css': responseHandler.getCss,
   index: responseHandler.getIndex,
-  notReal: responseHandler.notReal
+  notReal: responseHandler.getNotFound
+};
+
+const parseBody = (request, response, handler) => {
+
+  const body = [];
+
+  request.on('error', (err) => {
+    console.dir(err);
+    response.statusCode = 400;
+    response.end();
+  });
+
+  request.on('data', (chunk) => {
+    body.push(chunk);
+  });
+
+  request.on('end', () => {
+    const bodyString = Buffer.concat(body).toString();
+    request.body = JSON.parse(bodyString);
+    handler(request, response);
+  });
 };
 
 // handle HTTP requests. In node the HTTP server will automatically
@@ -26,12 +47,18 @@ const onRequest = (request, response) => {
   // grab the 'accept' headers (comma delimited) and split them into an array
   // store them inside of the request object for use in handler functions
   request.acceptedTypes = request.headers.accept.split(',');
-  request.query = parsedUrl.searchParams;
-
+  request.query = parsedUrl.searchParams; 
+  
   // check if the path name (the /name part of the url) matches
   // any in our url object. If so call that function. If not, default to index.
   if (urlStruct[parsedUrl.pathname]) {
-    urlStruct[parsedUrl.pathname](request, response);
+    const handler = urlStruct[parsedUrl.pathname];
+    if(request.method==='POST'){
+      parseBody(request, response, handler);
+    }else{
+      handler(request,response);
+    }
+  
   } else {
     // otherwise send them to the index (normally this would be the 404 page)
     urlStruct.notReal(request, response);
